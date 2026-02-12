@@ -77,21 +77,6 @@ def parse_note_block(block: str, line_number: int) -> ParsedNote:
                 current_content.append(line)
             continue
 
-        # Check for escaped prefix (e.g., \A: -> literal A:)
-        # This allows multiple choice options like \A: First option
-        escaped_prefix = False
-        for prefix in ALL_PREFIX_TO_FIELD:
-            if line.startswith("\\" + prefix):
-                # Remove the backslash, treat rest as content
-                line = line[1:]
-                escaped_prefix = True
-                break
-
-        if escaped_prefix:
-            if current_field:
-                current_content.append(line)
-            continue
-
         new_field = None
         for prefix, field_name in ALL_PREFIX_TO_FIELD.items():
             if (
