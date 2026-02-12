@@ -10,15 +10,15 @@
 
 ## The Problem
 
-Managing Anki decks through the UI can feel complex and slow. Working with decks as plain text files on the other hand would enable AI support, batch editing, and version control.
+Editing flashcards in Anki's UI is tedious when you could be using your text editor, AI tools, and Git. Currently available Markdown → Anki tools only go one way, where edits in Anki don't sync back.
 
 ## The Solution
 
-DeckOps is an Anki ↔ Markdown bridge that provides this exact workflow. Each Anki deck is represented by a single Markdown file. Edits in either place can be synced to the other. This enables a hybrid approach between Anki and your filesystem, allowing for faster editing and easier maintenance.
+DeckOps is a fully bidirectional Anki ↔ Markdown bridge. Each deck becomes a single Markdown file that you can edit with your favorite tools. Changes sync both ways, so you can work in Anki or your editor and always stay in sync. This brings AI assistance, batch editing, and version control to your flashcard workflow.
 
 ## Features
 
-- Fully round-trip, bidirectional sync that handles identites, moves, drifts, conflicts, and deletions
+- Fully round-trip, bidirectional sync that handles cards identites, moves, deletions, drifts, and conflicts.
 - Markdown support with nearly all features (including syntax-highlighted code blocks, supported on desktop and mobile)
 - Built-in Git integration with autocommit for tracking all changes
 - Image support via VS Code where images are directly copied into your Anki media folder (automatically set up)
@@ -98,16 +98,19 @@ You can either export your deck using Anki's native export feature (`.apkg` file
 
 ### How can I migrate my existing cards into DeckOps?
 
-While it is doable, the migration can be tricky. If you convert your cards into DeckOps' note types, then all you need to do is export your cards from Anki to Markdown. In the first re-import, some formatting may be changed because the original HTML from Anki may not follow the CommonMark standard; however, all changes are easily trackable via Git. If your note format does not work with the DeckOps format, you will have to adapt the code to your needs.
+While it is doable, the migration can be tricky. If you convert your cards into DeckOps' note types, then all you need to do is export your cards from Anki to Markdown. In the first re-import, some formatting may be changed because the original HTML from Anki may not follow the CommonMark standard. If your note format does not work with the DeckOps format, you will have to adapt the code to your needs.
 
 ### How can I develop DeckOps locally?
 
-Fork this repository and initialize the tutorial in your root folder (make sure Anki is running). This will create a folder called `collection` with the sample Markdown in it. Paths will adapt automatically to the development environment. You can run DeckOps using the main script:
-```bash
-python -m main init --tutorial
-python -m main ma
-```
+Fork this repository and initialize the tutorial in your root folder (make sure Anki is running). This will create a folder called `collection` with the sample Markdown in it. Paths will adapt automatically to the development environment. You can run DeckOps locally using the main script.
 
+```bash
+git clone https://github.com/visserle/deckops.git
+cd deckops
+uv sync
+uv run python -m main init --tutorial
+uv run python -m main ma
+```
 
 ### What commands and flags are available in the CLI?
 
