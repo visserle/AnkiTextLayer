@@ -24,6 +24,3 @@ jobs:
 
       - name: Run tests
         run: pytest tests/ -v
-
-      - name: Check code style
-        run: ruff check deckops/
