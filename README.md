@@ -21,6 +21,7 @@ Editing flashcards in Anki's UI is tedious when you could be using your favorite
 - Image support via VS Code where images are directly copied into your Anki media folder (automatically set up)
 - Simple CLI interface: after initialization, only two commands are needed for daily use
 
+> [!NOTE]
 > **Note:** DeckOps only syncs the `DeckOpsQA` and `DeckOpsCloze` note types. Other note types will not be synced.
 
 
