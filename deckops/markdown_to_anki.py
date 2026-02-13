@@ -19,6 +19,16 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class NoteInfo:
+    """Cached information about a note from Anki."""
+
+    note_id: int
+    fields: dict[str, str]
+    card_ids: list[int]
+    model_name: str
+
+
+@dataclass
 class ImportResult:
     """Result of importing a single note."""
 
@@ -142,20 +152,27 @@ def _batch_write_ids_to_file(
         raise ValueError(error_msg)
 
     content = file_path.read_text(encoding="utf-8")
+
+    # Build replacement map: {old_text: new_text}
+    # This avoids creating n intermediate string copies
+    replacements: list[tuple[str, str]] = []
+
     for parsed_note, id_value in id_assignments:
         new_id_comment = f"<!-- note_id: {id_value} -->"
 
         if parsed_note.note_id is not None:
             # Stale note: replace old ID comment with new one
             old_id_comment = f"<!-- note_id: {parsed_note.note_id} -->"
-            content = content.replace(old_id_comment, new_id_comment, 1)
+            replacements.append((old_id_comment, new_id_comment))
         else:
             # New note: prepend ID comment before first content line
             first_line = parsed_note.raw_content.strip().split("\n")[0]
-            if first_line in content:
-                content = content.replace(
-                    first_line, new_id_comment + "\n" + first_line, 1
-                )
+            replacements.append((first_line, new_id_comment + "\n" + first_line))
+
+    # Apply all replacements in single pass
+    for old_text, new_text in replacements:
+        content = content.replace(old_text, new_text, 1)
+
     file_path.write_text(content, encoding="utf-8")
 
 
@@ -184,9 +201,7 @@ def _import_existing_notes(
         return []
 
     # Extract fields and perform safety checks in a single pass
-    note_fields: dict[int, dict[str, str]] = {}
-    note_card_ids: dict[int, list[int]] = {}
-    note_id_to_model: dict[int, str] = {}
+    notes_by_id: dict[int, NoteInfo] = {}
 
     for note in notes_info:
         if note:
@@ -199,12 +214,13 @@ def _import_existing_notes(
                     f"DeckOps will never modify notes with non-DeckOps templates."
                 )
 
-            # Extract fields and track note types
-            note_fields[note["noteId"]] = {
-                name: info["value"] for name, info in note["fields"].items()
-            }
-            note_card_ids[note["noteId"]] = note.get("cards", [])
-            note_id_to_model[note["noteId"]] = model
+            # Store note information in consolidated structure
+            notes_by_id[note["noteId"]] = NoteInfo(
+                note_id=note["noteId"],
+                fields={name: info["value"] for name, info in note["fields"].items()},
+                card_ids=note.get("cards", []),
+                model_name=model,
+            )
 
     # Safety check: Ensure note types in markdown match note types in Anki
     # AnkiConnect does not support changing note types
@@ -213,7 +229,8 @@ def _import_existing_notes(
             raise ValueError(
                 "Internal error: note_id is None for note in existing_notes list"
             )
-        anki_note_type = note_id_to_model.get(parsed_note.note_id)
+        note_info = notes_by_id.get(parsed_note.note_id)
+        anki_note_type = note_info.model_name if note_info else None
         if anki_note_type and anki_note_type != parsed_note.note_type:
             raise ValueError(
                 f"Note type mismatch for note {parsed_note.note_id} "
@@ -226,7 +243,7 @@ def _import_existing_notes(
             )
 
     # Move cards that are in the wrong deck
-    all_card_ids = [cid for cids in note_card_ids.values() for cid in cids]
+    all_card_ids = [cid for info in notes_by_id.values() for cid in info.card_ids]
     if all_card_ids:
         try:
             cards_info = invoke("cardsInfo", cards=all_card_ids)
@@ -238,7 +255,9 @@ def _import_existing_notes(
             if cards_to_move:
                 invoke("changeDeck", cards=cards_to_move, deck=deck_name)
                 card_to_note_map = {
-                    cid: nid for nid, cids in note_card_ids.items() for cid in cids
+                    cid: info.note_id
+                    for info in notes_by_id.values()
+                    for cid in info.card_ids
                 }
                 card_to_deck_map = {c["cardId"]: c["deckName"] for c in cards_info if c}
                 moved_notes = set()
@@ -265,7 +284,8 @@ def _import_existing_notes(
             raise ValueError(
                 "Internal error: note_id is None for note in existing_notes list"
             )
-        current = note_fields.get(parsed_note.note_id, {})
+        note_info = notes_by_id.get(parsed_note.note_id)
+        current = note_info.fields if note_info else {}
         if not current:
             logger.info(
                 f"  Note {parsed_note.note_id} "
@@ -626,9 +646,15 @@ def import_collection(
     duplicate_ids: set[int] = set()
 
     # Check for duplicate deck_ids and note_ids in a single pass
+    # Parse each file only once for better performance
     for md_file in md_files:
+        # Parse file once - extract both deck_id and notes
+        content = md_file.read_text(encoding="utf-8")
+        deck_id, remaining = extract_deck_id(content)
+        blocks = remaining.split(NOTE_SEPARATOR)
+        parsed_notes = [parse_note_block(block) for block in blocks if block.strip()]
+
         # Check deck_id duplicates
-        deck_id = parse_deck_id(md_file)
         if deck_id is not None:
             if deck_id in deck_id_sources:
                 duplicates.append(
@@ -640,7 +666,7 @@ def import_collection(
                 deck_id_sources[deck_id] = md_file.name
 
         # Check note_id duplicates
-        for parsed_note in parse_markdown_file(md_file):
+        for parsed_note in parsed_notes:
             if parsed_note.note_id is not None:
                 if parsed_note.note_id in note_id_sources:
                     duplicates.append(
