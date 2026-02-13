@@ -1,7 +1,7 @@
 {{edit:Question}}
 
-<div id="answer-count-hint" style="margin: 10px auto; max-width: 600px; text-align: center; color: #666; font-style: italic;"></div>
-<div id="choices" style="margin: 20px auto; max-width: 600px;"></div>
+<div id="answer-count-hint"></div>
+<div id="choices"></div>
 
 <script>
 // Parse answer field to determine number of correct answers

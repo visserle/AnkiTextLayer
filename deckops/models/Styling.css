@@ -29,6 +29,19 @@
 }
 
 /* Choice card styles */
+#answer-count-hint {
+	margin: 10px auto;
+	max-width: 600px;
+	text-align: center;
+	color: #666;
+	font-style: italic;
+}
+
+#choices {
+	margin: 20px auto;
+	max-width: 600px;
+}
+
 .choice-item {
 	text-align: left;
 	display: block;
