@@ -41,7 +41,7 @@ def transcribe_deck(
     """Transcribe an Anki deck to a Markdown file (excluding subdecks)."""
     converter = HTMLToMarkdown()
     # Collect (note_id, formatted_block) tuples.
-    # In Anki the note ID is the creation timestamp in milliseconds.
+    # In Anki the note ID is the UNIX timestamp in milliseconds.
     blocks_with_ids: list[tuple[int, str]] = []
 
     for note_type in SUPPORTED_NOTE_TYPES:
