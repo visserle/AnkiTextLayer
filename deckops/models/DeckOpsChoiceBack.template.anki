@@ -1,34 +1,22 @@
-<style>
-    .choice-item {
-        text-align: left;
-        display: block;
-        padding: 8px;
-        margin: 4px 0;
-        border-radius: 4px;
-        background-color: #f0f0f0;
-    }
-    .night-mode .choice-item {
-        background-color: #333;
-    }
-    .choice-correct {
-        background-color: #d4edda !important;
-        font-weight: bold;
-        border: 2px solid #28a745;
-    }
-    .night-mode .choice-correct {
-        background-color: #1e4620 !important;
-        border-color: #28a745;
-    }
-    .choice-incorrect {
-        opacity: 0.4;
-    }
-</style>
-
 {{edit:Question}}
 
+<div id="answer-count-hint" style="margin: 10px auto; max-width: 600px; text-align: center; color: #666; font-style: italic;"></div>
 <div id="choices" style="margin: 20px auto; max-width: 600px;"></div>
 
 <script>
+// Parse answer field to determine number of correct answers
+var answerText = "{{Answer}}";
+var correctAnswers = answerText.split(',').map(function(s) { return s.trim(); });
+var numCorrect = correctAnswers.length;
+
+// Display hint about number of correct answers (for alignment with front)
+var hintDiv = document.getElementById('answer-count-hint');
+if (numCorrect > 1) {
+    hintDiv.textContent = 'Select ' + numCorrect + ' answers.';
+} else {
+    hintDiv.textContent = 'Select 1 answer';
+}
+
 // Build choices array from fields
 var choices = [];
 {{#Choice 1}}
@@ -52,10 +40,6 @@ choices.push({num: 6, text: `{{Choice 6}}`});
 {{#Choice 7}}
 choices.push({num: 7, text: `{{Choice 7}}`});
 {{/Choice 7}}
-
-// Parse answer field
-var answerText = "{{Answer}}";
-var correctAnswers = answerText.split(',').map(function(s) { return s.trim(); });
 
 // Get card ID and review counter for consistent shuffle matching front
 var cardId = document.documentElement.dataset.cid || '0';
@@ -101,11 +85,9 @@ choices.forEach(function(choice) {
     div.setAttribute('data-num', choice.num);
     div.innerHTML = choice.text;
 
-    // Apply correct/incorrect styling
+    // Highlight correct answers
     if (correctAnswers.indexOf(String(choice.num)) !== -1) {
         div.classList.add('choice-correct');
-    } else {
-        div.classList.add('choice-incorrect');
     }
 
     container.appendChild(div);
