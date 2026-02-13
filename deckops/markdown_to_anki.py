@@ -9,6 +9,7 @@ from deckops.config import NOTE_SEPARATOR, SUPPORTED_NOTE_TYPES
 from deckops.markdown_converter import MarkdownToHTML
 from deckops.markdown_helpers import (
     ParsedNote,
+    _note_identifier,
     extract_deck_id,
     parse_note_block,
     validate_note,
@@ -62,12 +63,10 @@ def parse_markdown_file(file_path: Path) -> list[ParsedNote]:
     blocks = content.split(NOTE_SEPARATOR)
 
     parsed_notes = []
-    line_number = 1
 
     for block in blocks:
         if block.strip():
-            parsed_notes.append(parse_note_block(block, line_number))
-        line_number += block.count("\n") + NOTE_SEPARATOR.count("\n")
+            parsed_notes.append(parse_note_block(block))
 
     return parsed_notes
 
@@ -118,22 +117,25 @@ def _batch_write_ids_to_file(
 
     # VALIDATION: Check for duplicate first lines among new notes
     # This would cause only the first note to get an ID, orphaning the others
-    new_notes_first_lines: dict[str, list[int]] = {}
+    new_notes_first_lines: dict[str, list[str]] = {}
     for parsed_note, id_value in id_assignments:
         if parsed_note.note_id is None:  # New note without existing ID
             first_line = parsed_note.raw_content.strip().split("\n")[0]
             if first_line not in new_notes_first_lines:
                 new_notes_first_lines[first_line] = []
-            new_notes_first_lines[first_line].append(parsed_note.line_number)
+            new_notes_first_lines[first_line].append(_note_identifier(parsed_note))
 
     # Check for duplicates
     duplicates = {
-        line: nums for line, nums in new_notes_first_lines.items() if len(nums) > 1
+        line: identifiers
+        for line, identifiers in new_notes_first_lines.items()
+        if len(identifiers) > 1
     }
     if duplicates:
         error_msg = f"ERROR: Duplicate first lines detected in {file_path.name}:\n"
-        for first_line, line_numbers in duplicates.items():
-            error_msg += f"  '{first_line[:60]}...' appears at lines: {line_numbers}\n"
+        for first_line, identifiers in duplicates.items():
+            notes_list = ', '.join(identifiers)
+            error_msg += f"  '{first_line[:60]}...' in notes: {notes_list}\n"
         error_msg += (
             "Cannot safely assign IDs. Please ensure each note has a unique first line."
         )
@@ -177,7 +179,7 @@ def _import_existing_notes(
     except Exception as e:
         for parsed_note, _ in existing_notes:
             result.errors.append(
-                f"Note {parsed_note.note_id} (line {parsed_note.line_number}): {e}"
+                f"Note {parsed_note.note_id} ({_note_identifier(parsed_note)}): {e}"
             )
         return []
 
@@ -212,7 +214,7 @@ def _import_existing_notes(
         if anki_note_type and anki_note_type != parsed_note.note_type:
             raise ValueError(
                 f"Note type mismatch for note {parsed_note.note_id} "
-                f"(line {parsed_note.line_number}): "
+                f"({_note_identifier(parsed_note)}): "
                 f"Markdown specifies '{parsed_note.note_type}' "
                 f"but Anki has '{anki_note_type}'. "
                 f"AnkiConnect does not support changing note types. "
@@ -261,7 +263,7 @@ def _import_existing_notes(
         if not current:
             logger.info(
                 f"  Note {parsed_note.note_id} "
-                f"(line {parsed_note.line_number}) "
+                f"({_note_identifier(parsed_note)}) "
                 f"no longer in Anki, will re-create"
             )
             stale.append((parsed_note, html_fields))
@@ -293,13 +295,13 @@ def _import_existing_notes(
                 else:
                     result.errors.append(
                         f"Note {notes_to_update[i].note_id} "
-                        f"(line {notes_to_update[i].line_number}): "
+                        f"({_note_identifier(notes_to_update[i])}): "
                         f"{res}"
                     )
         except Exception as e:
             for parsed_note in notes_to_update:
                 result.errors.append(
-                    f"Note {parsed_note.note_id} (line {parsed_note.line_number}): {e}"
+                    f"Note {parsed_note.note_id} ({_note_identifier(parsed_note)}): {e}"
                 )
 
     return stale
@@ -336,7 +338,7 @@ def _create_new_notes(
         create_results = invoke("multi", actions=create_actions)
     except Exception as e:
         for parsed_note, _ in new_notes:
-            result.errors.append(f"Note new (line {parsed_note.line_number}): {e}")
+            result.errors.append(f"Note new ({_note_identifier(parsed_note)}): {e}")
         return []
 
     note_id_assignments: list[tuple[ParsedNote, int]] = []
@@ -347,7 +349,7 @@ def _create_new_notes(
             result.created += 1
         else:
             result.errors.append(
-                f"Note new (line {parsed_note.line_number}): {note_id}"
+                f"Note new ({_note_identifier(parsed_note)}): {note_id}"
             )
 
     return note_id_assignments
@@ -473,7 +475,7 @@ def import_file(
             for err in validation_errors:
                 result.errors.append(
                     f"Note {parsed_note.note_id or 'new'} "
-                    f"(line {parsed_note.line_number}): {err}"
+                    f"({_note_identifier(parsed_note)}): {err}"
                 )
             continue
 
@@ -482,7 +484,7 @@ def import_file(
         except Exception as e:
             result.errors.append(
                 f"Note {parsed_note.note_id or 'new'} "
-                f"(line {parsed_note.line_number}): {e}"
+                f"({_note_identifier(parsed_note)}): {e}"
             )
             continue
 
@@ -495,7 +497,7 @@ def import_file(
             new.append((parsed_note, html_fields))
         else:
             result.errors.append(
-                f"Note new (line {parsed_note.line_number}): No deck_name"
+                f"Note new ({_note_identifier(parsed_note)}): No deck_name"
             )
 
     # Phase 1: Update existing notes (returns stale entries)

@@ -17,6 +17,12 @@ from deckops.config import (
 
 logger = logging.getLogger(__name__)
 
+# Regex patterns used throughout parsing and validation
+_CLOZE_PATTERN = re.compile(r"\{\{c\d+::")
+_NOTE_ID_PATTERN = re.compile(r"<!--\s*note_id:\s*(\d+)\s*-->")
+_DECK_ID_PATTERN = re.compile(r"<!--\s*deck_id:\s*(\d+)\s*-->\n?")
+_CODE_FENCE_PATTERN = re.compile(r"^(```|~~~)")
+
 
 @dataclass
 class ParsedNote:
@@ -24,12 +30,24 @@ class ParsedNote:
     note_type: str  # "DeckOpsQA" or "DeckOpsCloze"
     fields: dict[str, str]
     raw_content: str
-    line_number: int
+
+
+def _note_identifier(note: ParsedNote) -> str:
+    """Return stable identifier for error messages.
+
+    Line numbers become stale after ID insertion, so we use note_id
+    when available, or first line of content for new notes.
+    """
+    if note.note_id:
+        return f"note_id: {note.note_id}"
+    # Use first line of content (up to 60 chars)
+    first_line = note.raw_content.strip().split("\n")[0][:60]
+    return f"'{first_line}...'"
 
 
 def extract_deck_id(content: str) -> tuple[int | None, str]:
     """Extract deck_id from the first line and return (deck_id, remaining content)."""
-    match = re.match(r"<!--\s*deck_id:\s*(\d+)\s*-->\n?", content)
+    match = _DECK_ID_PATTERN.match(content)
     if match:
         return int(match.group(1)), content[match.end() :]
     return None, content
@@ -47,9 +65,9 @@ def extract_note_blocks(content: str) -> dict[str, str]:
         stripped = block.strip()
         if not stripped:
             continue
-        match = re.match(r"<!--\s*(note_id:\s*\d+)\s*-->", stripped)
+        match = _NOTE_ID_PATTERN.match(stripped)
         if match:
-            key = re.sub(r"\s+", " ", match.group(1))
+            key = f"note_id: {match.group(1)}"
             notes[key] = stripped
     return notes
 
@@ -76,26 +94,26 @@ def _detect_note_type(fields):
     )
 
 
-def parse_note_block(block: str, line_number: int) -> ParsedNote:
+def parse_note_block(block: str) -> ParsedNote:
     lines = block.strip().split("\n")
     note_id = None
     fields: dict[str, str] = {}
     current_field = None
     current_content: list[str] = []
     in_code_block = False
-    seen_fields: dict[str, int] = {}  # field_name -> line offset where first seen
+    seen_fields: dict[str, bool] = {}  # field_name -> whether it was seen
 
-    for line_offset, line in enumerate(lines):
+    for line in lines:
         # Track fenced code blocks (``` or ~~~) to avoid detecting
         # Q:/A:/T: prefixes inside code examples
         stripped = line.lstrip()
-        if stripped.startswith("```") or stripped.startswith("~~~"):
+        if _CODE_FENCE_PATTERN.match(stripped):
             in_code_block = not in_code_block
             if current_field:
                 current_content.append(line)
             continue
 
-        note_id_match = re.match(r"<!--\s*note_id:\s*(\d+)\s*-->", line)
+        note_id_match = _NOTE_ID_PATTERN.match(line)
         if note_id_match:
             note_id = int(note_id_match.group(1))
             continue
@@ -115,29 +133,22 @@ def parse_note_block(block: str, line_number: int) -> ParsedNote:
             ):
                 # Check for duplicate field marker
                 if field_name in seen_fields:
-                    # Build ID reference for better error context
-                    id_ref = f"note_id: {note_id}" if note_id is not None else ""
-
                     # Build context for error message
-                    if id_ref:
-                        context = f"in {id_ref}"
+                    if note_id:
+                        context = f"in note_id: {note_id}"
                     else:
-                        first_line = line_number + seen_fields[field_name]
-                        current_line = line_number + line_offset
-                        context = (
-                            f"at line {current_line} (first seen at line {first_line})"
-                        )
+                        context = "in this note"
+
                     msg = (
                         f"Duplicate field '{prefix}' {context}. "
-                        f"Did you forget to end the previous note with a blank line, "
-                        f"three dashes '---' and another blank line, or is "
-                        f"there an accidental duplicate prefix? "
+                        f"Did you forget to end the previous note with '\\n\\n---\\n\\n' "
+                        f"or is there an accidental duplicate prefix?"
                     )
                     logger.error(msg)
                     raise ValueError(msg)
 
                 new_field = field_name
-                seen_fields[field_name] = line_offset
+                seen_fields[field_name] = True
                 if current_field:
                     fields[current_field] = "\n".join(current_content).strip()
 
@@ -161,7 +172,6 @@ def parse_note_block(block: str, line_number: int) -> ParsedNote:
         note_type=note_type,
         fields=fields,
         raw_content=block,
-        line_number=line_number,
     )
 
 
@@ -181,10 +191,9 @@ def validate_note(note: ParsedNote) -> list[str]:
             errors.append(f"Missing mandatory field '{field_name}' ({prefix})")
 
     # Cloze notes must contain at least one cloze deletion in the Text field
-    cloze_pattern = re.compile(r"\{\{c\d+::")
     if note.note_type == "DeckOpsCloze":
         text = note.fields.get("Text", "")
-        if text and not cloze_pattern.search(text):
+        if text and not _CLOZE_PATTERN.search(text):
             errors.append(
                 "DeckOpsCloze note must contain cloze syntax "
                 "(e.g. {{c1::answer}}) in the T: field"

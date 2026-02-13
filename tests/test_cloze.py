@@ -23,7 +23,7 @@ class TestParseClozBlock:
             "T: The capital of {{c1::France}} is {{c2::Paris}}\n"
             "E: Geography fact"
         )
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         assert parsed_note.note_id == 789
         assert parsed_note.note_type == "DeckOpsCloze"
         assert (
@@ -34,7 +34,7 @@ class TestParseClozBlock:
 
     def test_cloze_without_id_detected_from_prefix(self):
         block = "T: This is a {{c1::cloze}} test\nE: Extra"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         assert parsed_note.note_id is None
         assert parsed_note.note_type == "DeckOpsCloze"
         assert parsed_note.fields["Text"] == "This is a {{c1::cloze}} test"
@@ -44,7 +44,7 @@ class TestParseClozBlock:
             "<!-- note_id: 100 -->\n"
             "T: The {{c1::mitochondria::organelle}} is the powerhouse of the cell"
         )
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         assert parsed_note.note_type == "DeckOpsCloze"
         assert "{{c1::mitochondria::organelle}}" in parsed_note.fields["Text"]
 
@@ -55,7 +55,7 @@ class TestParseClozBlock:
             "Second line continues\n"
             "E: Some extra info"
         )
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         assert parsed_note.note_type == "DeckOpsCloze"
         assert (
             "First line with {{c1::cloze}}\nSecond line continues"
@@ -64,14 +64,14 @@ class TestParseClozBlock:
 
     def test_cloze_all_fields(self):
         block = "<!-- note_id: 300 -->\nT: {{c1::Answer}}\nE: Extra\nM: More info"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         assert parsed_note.fields["Text"] == "{{c1::Answer}}"
         assert parsed_note.fields["Extra"] == "Extra"
         assert parsed_note.fields["More"] == "More info"
 
     def test_cloze_text_only(self):
         block = "<!-- note_id: 400 -->\nT: Just {{c1::text}}"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         assert parsed_note.note_type == "DeckOpsCloze"
         assert len(parsed_note.fields) == 1
         assert parsed_note.fields["Text"] == "Just {{c1::text}}"
@@ -82,7 +82,7 @@ class TestParseQABlock:
 
     def test_qa_with_note_id(self):
         block = "<!-- note_id: 123 -->\nQ: What?\nA: This"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         assert parsed_note.note_id == 123
         assert parsed_note.note_type == "DeckOpsQA"
         assert parsed_note.fields["Question"] == "What?"
@@ -90,7 +90,7 @@ class TestParseQABlock:
 
     def test_qa_without_id(self):
         block = "Q: New question\nA: New answer"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         assert parsed_note.note_type == "DeckOpsQA"
         assert parsed_note.note_id is None
 
@@ -176,17 +176,17 @@ class TestValidateNote:
 
     def test_valid_qa_card(self):
         block = "<!-- note_id: 1 -->\nQ: Question\nA: Answer"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         assert validate_note(parsed_note) == []
 
     def test_valid_cloze_card(self):
         block = "<!-- note_id: 1 -->\nT: {{c1::text}}"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         assert validate_note(parsed_note) == []
 
     def test_missing_mandatory_qa_fields(self):
         block = "<!-- note_id: 1 -->\nQ: Question only"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         errors = validate_note(parsed_note)
         assert any("Answer" in e and "A:" in e for e in errors)
 
@@ -197,7 +197,6 @@ class TestValidateNote:
             note_type="DeckOpsCloze",
             fields={"Extra": "Only extra"},
             raw_content="<!-- note_id: 1 -->\nE: Only extra",
-            line_number=1,
         )
         errors = validate_note(parsed_note)
         for field_name, prefix in self._mandatory_fields("DeckOpsCloze"):
@@ -206,22 +205,22 @@ class TestValidateNote:
     def test_no_unique_prefix_raises(self):
         block = "<!-- note_id: 1 -->\nE: Only extra"
         with pytest.raises(ValueError, match="Cannot determine note type"):
-            parse_note_block(block, 1)
+            parse_note_block(block)
 
     def test_cloze_without_cloze_syntax(self):
         block = "T: This has no cloze deletions"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         errors = validate_note(parsed_note)
         assert any("cloze syntax" in e for e in errors)
 
     def test_cloze_with_valid_syntax(self):
         block = "T: The {{c1::answer}} is here"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         assert validate_note(parsed_note) == []
 
     def test_continuation_lines_not_flagged(self):
         block = "<!-- note_id: 1 -->\nQ: Question\nA: Answer starts\nmore answer text"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         assert validate_note(parsed_note) == []
 
 

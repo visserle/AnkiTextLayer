@@ -17,7 +17,7 @@ class TestParseChoiceBlock:
             "C3: Berlin\n"
             "A: 1"
         )
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         assert parsed_note.note_id == 789
         assert parsed_note.note_type == "DeckOpsChoice"
         assert parsed_note.fields["Question"] == "What is the capital of France?"
@@ -28,7 +28,7 @@ class TestParseChoiceBlock:
 
     def test_choice_without_id_detected_from_prefix(self):
         block = "Q: Test\nC1: Choice 1\nC2: Choice 2\nA: 1"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         assert parsed_note.note_id is None
         assert parsed_note.note_type == "DeckOpsChoice"
 
@@ -41,7 +41,7 @@ class TestParseChoiceBlock:
             "E: Extra info\n"
             "M: More info"
         )
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         assert parsed_note.note_type == "DeckOpsChoice"
         assert parsed_note.fields["Choice 7"] == "G"
         assert parsed_note.fields["Extra"] == "Extra info"
@@ -53,7 +53,7 @@ class TestParseChoiceBlock:
             "C1: Choice 1\n"
             "A: 1"
         )
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         assert parsed_note.fields["Question"] == "First line\nSecond line"
 
 
@@ -62,26 +62,26 @@ class TestValidateChoiceNote:
 
     def test_valid_single_choice(self):
         block = "Q: Question?\nC1: Choice 1\nC2: Choice 2\nA: 1"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         errors = validate_note(parsed_note)
         assert errors == []
 
     def test_valid_multiple_choice(self):
         block = "Q: Question?\nC1: A\nC2: B\nC3: C\nA: 1, 2"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         errors = validate_note(parsed_note)
         assert errors == []
 
     def test_valid_multiple_choice_three_answers(self):
         block = "Q: Question?\nC1: A\nC2: B\nC3: C\nC4: D\nA: 1, 2, 4"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         errors = validate_note(parsed_note)
         assert errors == []
 
     def test_answer_with_spaces(self):
         """Answer field can have spaces around commas."""
         block = "Q: Question?\nC1: A\nC2: B\nC3: C\nA: 1 , 2 , 3"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         errors = validate_note(parsed_note)
         assert errors == []
 
@@ -92,7 +92,6 @@ class TestValidateChoiceNote:
             note_type="DeckOpsChoice",
             fields={"Choice 1": "A", "Choice 2": "B", "Answer": "1"},
             raw_content=block,
-            line_number=1,
         )
         errors = validate_note(parsed_note)
         assert any("Question" in e for e in errors)
@@ -104,7 +103,6 @@ class TestValidateChoiceNote:
             note_type="DeckOpsChoice",
             fields={"Question": "Q?", "Answer": "1"},
             raw_content=block,
-            line_number=1,
         )
         errors = validate_note(parsed_note)
         assert any("Choice 1" in e or "C1:" in e for e in errors)
@@ -116,41 +114,40 @@ class TestValidateChoiceNote:
             note_type="DeckOpsChoice",
             fields={"Question": "Q?", "Choice 1": "A", "Choice 2": "B"},
             raw_content=block,
-            line_number=1,
         )
         errors = validate_note(parsed_note)
         assert any("Answer" in e or "A:" in e for e in errors)
 
     def test_invalid_answer_not_integer(self):
         block = "Q: Question?\nC1: A\nC2: B\nA: abc"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         errors = validate_note(parsed_note)
         assert any("integers" in e for e in errors)
 
     def test_invalid_answer_mixed_content(self):
         block = "Q: Question?\nC1: A\nC2: B\nA: 1, abc, 2"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         errors = validate_note(parsed_note)
         assert any("integers" in e for e in errors)
 
     def test_answer_out_of_range_too_high(self):
         """Answer references choice number that doesn't exist."""
         block = "Q: Question?\nC1: A\nC2: B\nA: 3"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         errors = validate_note(parsed_note)
         assert any("only 2 choice(s) are provided" in e for e in errors)
 
     def test_answer_out_of_range_zero(self):
         """Answer with 0 is invalid (choices start at 1)."""
         block = "Q: Question?\nC1: A\nC2: B\nA: 0"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         errors = validate_note(parsed_note)
         assert len(errors) > 0
 
     def test_answer_out_of_range_negative(self):
         """Negative answer is invalid."""
         block = "Q: Question?\nC1: A\nC2: B\nA: -1"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         errors = validate_note(parsed_note)
         assert len(errors) > 0
 
@@ -161,21 +158,21 @@ class TestValidateChoiceNote:
             "C1: A\nC2: B\nC3: C\nC4: D\nC5: E\nC6: F\nC7: G\n"
             "A: 7"
         )
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         errors = validate_note(parsed_note)
         assert errors == []
 
     def test_answer_exceeds_seven(self):
         """Answer > 7 is always invalid."""
         block = "Q: Question?\nC1: A\nC2: B\nA: 8"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         errors = validate_note(parsed_note)
         assert len(errors) > 0
 
     def test_valid_sparse_choices(self):
         """Choices don't have to be consecutive (e.g., C1, C2, C4)."""
         block = "Q: Question?\nC1: A\nC2: B\nC4: D\nA: 4"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         errors = validate_note(parsed_note)
         # Should be valid - answer 4 is provided
         assert errors == []
@@ -183,6 +180,6 @@ class TestValidateChoiceNote:
     def test_multiple_answers_one_out_of_range(self):
         """If any answer in multi-choice is out of range, it's an error."""
         block = "Q: Question?\nC1: A\nC2: B\nC3: C\nA: 1, 2, 5"
-        parsed_note = parse_note_block(block, 1)
+        parsed_note = parse_note_block(block)
         errors = validate_note(parsed_note)
         assert any("only 3 choice(s) are provided" in e for e in errors)
