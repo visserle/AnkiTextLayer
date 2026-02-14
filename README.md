@@ -11,11 +11,12 @@ Editing flashcards in Anki's UI is tedious when you could be using your favorite
 ## Features
 
 - Fully round-trip, bidirectional sync that handles note creations, deletions, movements, and conflicts
-- Thoroughly tested, bidirectional conversion between Markdown and Anki-compatible HTML
 - High-performance processing: handles thousands of cards across hundreds of decks in seconds
 - Markdown rendering with nearly all features (including syntax-highlighted code blocks, supported on desktop and mobile)
+- Thoroughly tested, bidirectional conversion between Markdown and Anki-compatible HTML
 - Support for Basic (Q&A), Cloze, Single & Multiple Choice note types
-- Embed images via VS Code where they are directly copied into your Anki media folder (automatically set up)- Built-in Git integration with autocommit for tracking all changes
+- Embed images via VS Code where they are directly copied into your Anki media folder (automatically set up)
+- Built-in Git integration with autocommit for tracking all changes
 - Package/unpackage entire collections to JSON format for backup, sharing, or automated AI processing
 - Simple CLI interface: after initialization, only two commands are needed for daily use
 
