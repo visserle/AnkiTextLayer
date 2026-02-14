@@ -50,7 +50,7 @@ Most available tools are one-way importers: you write in Markdown or Obsidian an
 
 ### Is it safe to use?
 
-Yes, AnkiOps will never modify notes with non-AnkiOps note types. Your existing collection won't be affected and you can safely mix managed and unmanaged notes in the same deck. Further, AnkiOps only syncs if the activated profiles matches the one it was initialized with. When orphaned AnkiOps notes are detected, you will be prompted to confirm their deletion. Concerning your Markdown files, AnkiOps automatically creates a Git commit of your collection folder before every sync, so you can always roll your files back if needed.
+Yes, AnkiOps will never modify notes with non-AnkiOps note types. Your existing collection won't be affected and you can safely mix managed and unmanaged notes. Further, AnkiOps only syncs if the activated profiles matches the one it was initialized with. When orphaned AnkiOps notes are detected, you will be prompted to confirm their deletion. Concerning your Markdown files, AnkiOps automatically creates a Git commit of your collection folder before every sync, so you can always roll your files back if needed.
 
 ### How do I create new notes?
 
@@ -147,7 +147,3 @@ uv run python -m main ma
 - `FILE` - Serialized file to import: .json or .zip (required)
 - `--directory`, `-d` - Local collection directory to create/update (default: use file name)
 - `--overwrite` - Overwrite existing markdown files (media uses smart conflict resolution)
-
----
-
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/visserle)
