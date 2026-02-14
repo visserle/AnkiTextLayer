@@ -7,16 +7,8 @@ from html_to_markdown import ConversionOptions, convert_with_visitor
 
 # Characters that have special meaning in markdown
 # Use Unicode placeholders (zero-width joiners + unique pattern)
-# Note: [ and ] are NOT included because [text] is not special in markdown
-# (only [text](url) is), and the html-to-markdown library handles them correctly
 _MD_SPECIAL_CHARS = {
     "*": "\u200dMDESCASTERISK\u200d",
-    "_": "\u200dMDESCUNDERSCORE\u200d",
-    "`": "\u200dMDESCBACKTICK\u200d",
-    ">": "\u200dMDESCGT\u200d",
-    "#": "\u200dMDESCHASH\u200d",
-    "|": "\u200dMDESCPIPE\u200d",
-    "~": "\u200dMDESCTILDE\u200d",
 }
 
 # Tags where content is already protected (don't escape inside these)
@@ -156,6 +148,7 @@ class HTMLToMarkdown:
 
         # Arrow replacements (convert Unicode arrows back to ASCII)
         md = md.replace("\u2192", "-->").replace("\u21d2", "==>")
+
         # Collapse excessive newlines
         md = re.sub(r"\n{3,}", "\n\n", md)
 

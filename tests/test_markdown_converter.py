@@ -480,7 +480,13 @@ class TestRoundTripSpecialCharacters:
 
 
 class TestRoundTripEscapedCharacters:
-    """Test round-trip conversion of literal special characters in HTML."""
+    """Test round-trip conversion of literal special characters in HTML.
+
+    Note on > and # at line start:
+    These characters become markdown syntax after HTML round-trip (not
+    escaped). This is intentional - see TestRoundTripEscapedCharacters in
+    test_html_converter.py for detailed explanation of this trade-off.
+    """
 
     def test_literal_asterisks_roundtrip(self, md_to_html, html_to_md):
         # HTML with literal asterisks (not emphasis)
@@ -517,35 +523,54 @@ class TestRoundTripEscapedCharacters:
         restored_html = md_to_html.convert(md)
         assert "backticks" in restored_html
 
-    def test_literal_hash_roundtrip(self, md_to_html, html_to_md):
-        original_html = "# This is not a heading"
-        md = html_to_md.convert(original_html)
-        restored_html = md_to_html.convert(md)
-        assert "# This is not a heading" in restored_html or "#" in restored_html
+    def test_html_text_with_hash_becomes_heading_after_roundtrip(
+        self, md_to_html, html_to_md
+    ):
+        """HTML text starting with # becomes a heading after round-trip.
 
-    def test_literal_greater_than_at_line_start_roundtrip(self, md_to_html, html_to_md):
-        """Test that a literal > at the start of a line doesn't become a blockquote."""
-        original_html = "> This is not a blockquote"
-        md = html_to_md.convert(original_html)
-        # Should escape the > to prevent blockquote interpretation
-        assert r"\>" in md
-        restored_html = md_to_html.convert(md)
-        # Should restore as literal >, not as a blockquote
-        assert "> This is not a blockquote" in restored_html
-        assert "<blockquote>" not in restored_html
+        Flow: "# Title" in HTML -> "# Title" in markdown -> <h1> in HTML
 
-    def test_literal_greater_than_multiline_roundtrip(self, md_to_html, html_to_md):
-        """Test literal > at start of multiple lines."""
+        This enables Anki editing: type "# Title" as plain text, and it
+        becomes a proper heading after the next sync.
+        """
+        original_html = "# This text"
+        md = html_to_md.convert(original_html)
+        assert "# This text" in md
+
+        restored_html = md_to_html.convert(md)
+        assert "<h1>This text</h1>" in restored_html
+
+    def test_html_text_with_greater_than_becomes_blockquote_after_roundtrip(
+        self, md_to_html, html_to_md
+    ):
+        """HTML text starting with > becomes a blockquote after round-trip.
+
+        Flow: "> quote" in HTML -> "> quote" in markdown
+              -> <blockquote> in HTML
+
+        This enables Anki editing: type "> quote" as plain text, and it
+        becomes a proper blockquote after the next sync.
+        """
+        original_html = "> This text"
+        md = html_to_md.convert(original_html)
+        assert "> This text" in md
+
+        restored_html = md_to_html.convert(md)
+        assert "<blockquote>" in restored_html
+        assert "This text" in restored_html
+
+    def test_multiline_greater_than_becomes_blockquote(
+        self, md_to_html, html_to_md
+    ):
+        """Multiple lines starting with > become a blockquote after round-trip."""
         original_html = "> Line 1<br>> Line 2<br>> Line 3"
         md = html_to_md.convert(original_html)
-        # Should escape all the > characters
-        assert r"\>" in md
+        assert "> Line 1" in md
+        assert "> Line 2" in md
+        assert "> Line 3" in md
+
         restored_html = md_to_html.convert(md)
-        # Should preserve literal > characters, not create blockquote
-        assert "> Line 1" in restored_html
-        assert "> Line 2" in restored_html
-        assert "> Line 3" in restored_html
-        assert "<blockquote>" not in restored_html
+        assert "<blockquote>" in restored_html
 
     def test_mixed_literal_and_formatting_roundtrip(self, md_to_html, html_to_md):
         original_html = "Therapeut*in is <strong>important</strong>"
@@ -681,6 +706,55 @@ class TestRoundTripMathExpressions:
         html = md_to_html.convert(markdown_inline)
         assert r"\(" in html and r"\)" in html
         assert "x_i^2" in html
+
+
+class TestSpecialCharacterConversion:
+    """Test how special characters in markdown are converted to HTML."""
+
+    def test_asterisk_in_math_expression(self, md_to_html):
+        """Single asterisk in expressions like '2 * 3' stays as literal."""
+        md = "Calculate 2 * 3 = 6"
+        result = md_to_html.convert(md)
+        assert "2 * 3" in result or "2 \\* 3" in result
+        assert "<em>3" not in result, "Should not create emphasis"
+
+    def test_underscore_in_snake_case(self, md_to_html):
+        """Underscores in snake_case variable names stay as literal."""
+        md = "Use snake_case_variable here"
+        result = md_to_html.convert(md)
+        assert "snake_case_variable" in result
+        assert "<em>case</em>" not in result, "Should not create emphasis"
+
+    def test_hash_in_middle_of_line(self, md_to_html):
+        """Hash in middle of line (like #123) stays as literal, not heading."""
+        md = "Fixed issue #123 today"
+        result = md_to_html.convert(md)
+        assert "#123" in result
+        assert "<h1>" not in result and "<h2>" not in result
+
+    def test_pipe_in_plain_text(self, md_to_html):
+        """Pipe in plain text doesn't create table."""
+        md = "Choose option A | option B"
+        result = md_to_html.convert(md)
+        assert "option A" in result and "option B" in result
+        assert "<table>" not in result, "Should not create table"
+
+    def test_single_tilde_in_paths(self, md_to_html):
+        """Single tilde in file paths stays as literal, not strikethrough."""
+        md = "Edit ~/.bashrc file"
+        result = md_to_html.convert(md)
+        assert "~/.bashrc" in result
+        assert "<del>" not in result and "<s>" not in result
+
+    def test_arrow_syntax_converted_to_unicode(self, md_to_html):
+        """Arrow syntax (-->, ==>) is converted to Unicode arrow symbols."""
+        md_single = "A --> B"
+        result_single = md_to_html.convert(md_single)
+        assert "→" in result_single  # U+2192
+
+        md_double = "A ==> B"
+        result_double = md_to_html.convert(md_double)
+        assert "⇒" in result_double  # U+21D2
 
 
 class TestDirectMarkdownConversion:

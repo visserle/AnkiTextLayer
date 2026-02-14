@@ -318,7 +318,17 @@ class TestRoundTripBlockquotes:
 
 
 class TestRoundTripEscapedCharacters:
-    """Test round-trip conversion of escaped characters."""
+    r"""Test round-trip conversion of escaped characters.
+
+    Note on > and # at line start:
+    These characters are intentionally NOT preserved as escaped across
+    round-trips. This is a deliberate trade-off to enable better Anki editing:
+    - Users can type "> quote" or "# heading" in Anki to create formatting
+    - Anki stores typed > as &gt; (HTML entity), making it impossible to
+      distinguish from escaped \> in markdown
+    - We prioritize the common use case (creating blockquotes/headings) over
+      the rare case (preserving literal > or # at line start across round-trips)
+    """
 
     def test_escaped_asterisk_roundtrip(self, html_to_md, md_to_html):
         original_md = r"Therapeut\*in und Patient\*in"
@@ -351,20 +361,33 @@ class TestRoundTripEscapedCharacters:
         restored_md = html_to_md.convert(html)
         assert "# Not a heading" in restored_md
 
-    def test_escaped_greater_than_at_line_start_roundtrip(self, html_to_md, md_to_html):
-        """Test that escaped > at line start doesn't become a blockquote."""
-        original_md = r"\> This is not a blockquote"
+    def test_escaped_greater_than_becomes_blockquote_after_roundtrip(
+        self, html_to_md, md_to_html
+    ):
+        r"""Escaped > renders as literal initially, then becomes blockquote.
+
+        Flow: \> in markdown -> literal > in HTML -> > in markdown
+              -> <blockquote> in HTML
+
+        IMPORTANT: This "data loss" is intentional!
+        - Anki stores user-typed ">" as "&gt;" (HTML entity)
+        - We can't distinguish between escaped \> and user-typed >
+        - We choose to enable the common case: typing "> quote" in Anki to
+          create blockquotes, at the cost of not preserving literal >
+        """
+        original_md = r"\> This text"
         html = md_to_html.convert(original_md)
-        # HTML should contain literal >
-        assert (
-            "> This is not a blockquote" in html
-            or "&gt; This is not a blockquote" in html
-        )
+        # First conversion: escape works, HTML has literal >
+        assert "> This text" in html or "&gt; This text" in html
         assert "<blockquote>" not in html
-        # Convert back to markdown
+
+        # Convert HTML back to markdown
         restored_md = html_to_md.convert(html)
-        # Should preserve the escaped >
-        assert r"\>" in restored_md
+        assert "> This text" in restored_md
+
+        # Second conversion: now > is treated as blockquote syntax
+        html2 = md_to_html.convert(restored_md)
+        assert "<blockquote>" in html2
 
     def test_escaped_pipe_roundtrip(self, html_to_md, md_to_html):
         original_md = r"a \| b"
@@ -619,6 +642,101 @@ class TestRoundTripMathExpressions:
         assert "$$" in markdown
 
 
+class TestSpecialCharacterRoundTrips:
+    """Test how special characters behave during markdown->HTML->markdown round-trips.
+
+    These tests verify whether plain text with special characters survives round-trips
+    or gets interpreted as markdown syntax.
+    """
+
+    def test_asterisk_in_math_expression(self, html_to_md, md_to_html):
+        """Single asterisks in expressions like '2 * 3' are preserved as literal."""
+        original_md = "Calculate 2 * 3 = 6"
+        html = md_to_html.convert(original_md)
+        assert "2 <em>3 = 6" not in html, "Should not create emphasis"
+
+        restored_md = html_to_md.convert(html)
+        assert "2 * 3" in restored_md or r"2 \* 3" in restored_md
+
+    def test_underscore_in_variable_names(self, html_to_md, md_to_html):
+        """Underscores in snake_case variable names are preserved as literal."""
+        original_md = "Use snake_case_variable here"
+        html = md_to_html.convert(original_md)
+        assert "<em>case</em>" not in html, "Should not create emphasis"
+
+        restored_md = html_to_md.convert(html)
+        assert (
+            "snake_case_variable" in restored_md
+            or r"snake\_case\_variable" in restored_md
+        )
+
+    def test_backtick_creates_inline_code(self, html_to_md, md_to_html):
+        """Backticks create inline code formatting (expected markdown behavior)."""
+        original_md = "Press the `backtick` key"
+        html = md_to_html.convert(original_md)
+        assert "<code>backtick</code>" in html
+
+        restored_md = html_to_md.convert(html)
+        assert "`backtick`" in restored_md
+
+    def test_hash_in_middle_of_line_stays_literal(self, html_to_md, md_to_html):
+        """Hash in middle of line (like issue #123) stays as literal text."""
+        original_md = "Fixed issue #123 today"
+        html = md_to_html.convert(original_md)
+        assert "<h1>" not in html and "<h2>" not in html, "Should not create heading"
+
+        restored_md = html_to_md.convert(html)
+        assert "#123" in restored_md or r"\#123" in restored_md
+
+    def test_hash_at_line_start_creates_heading(self, html_to_md, md_to_html):
+        """Hash at line start creates heading (standard markdown behavior)."""
+        original_md = "# Heading"
+        html = md_to_html.convert(original_md)
+        assert "<h1>" in html
+
+        restored_md = html_to_md.convert(html)
+        assert "# Heading" in restored_md
+
+    def test_pipe_in_plain_text_stays_literal(self, html_to_md, md_to_html):
+        """Pipe in plain text (not table syntax) stays as literal character."""
+        original_md = "Choose option A | option B"
+        html = md_to_html.convert(original_md)
+        assert "<table>" not in html, "Should not create table"
+
+        restored_md = html_to_md.convert(html)
+        assert (
+            "option A | option B" in restored_md
+            or r"option A \| option B" in restored_md
+        )
+
+    def test_single_tilde_in_paths_stays_literal(self, html_to_md, md_to_html):
+        """Single tilde in file paths stays as literal (not strikethrough)."""
+        original_md = "Edit ~/.bashrc file"
+        html = md_to_html.convert(original_md)
+        assert "<del>" not in html and "<s>" not in html
+
+        restored_md = html_to_md.convert(html)
+        assert "~/.bashrc" in restored_md or r"\~/.bashrc" in restored_md
+
+    def test_double_arrow_conversion(self, html_to_md, md_to_html):
+        """==> is converted to Unicode ⇒ in HTML, then back to ==> in markdown."""
+        original_md = "A ==> B"
+        html = md_to_html.convert(original_md)
+        assert "⇒" in html or "==>" in html
+
+        restored_md = html_to_md.convert(html)
+        assert "A ==> B" in restored_md
+
+    def test_single_arrow_conversion(self, html_to_md, md_to_html):
+        """---> is converted to Unicode → in HTML, then back to --> in markdown."""
+        original_md = "A --> B"
+        html = md_to_html.convert(original_md)
+        assert "→" in html or "-->" in html
+
+        restored_md = html_to_md.convert(html)
+        assert "A --> B" in restored_md
+
+
 class TestDirectHTMLConversion:
     """Test direct HTML to markdown conversion."""
 
@@ -632,15 +750,14 @@ class TestDirectHTMLConversion:
         # Literal asterisks should be escaped
         assert r"\*" in result
 
-    def test_html_with_literal_greater_than_at_line_start(self, html_to_md):
-        """Test that literal > at start of line gets escaped in markdown."""
-        html = "> This is not a blockquote"
+    def test_html_with_line_starting_greater_than_becomes_blockquote(self, html_to_md):
+        """HTML text starting with > is converted to blockquote markdown syntax.
+
+        This means typing "> text" in Anki will become a blockquote after round-trip.
+        """
+        html = "> This text"
         result = html_to_md.convert(html)
-        # Should escape the > to prevent blockquote interpretation
-        assert r"\>" in result
-        # Should not produce blockquote markdown syntax (> with space)
-        # The escaped version should be \> not "> "
-        assert result.startswith(r"\>")
+        assert "> This text" in result
 
     def test_html_bold_tag(self, html_to_md):
         html = "<b>bold</b>"
