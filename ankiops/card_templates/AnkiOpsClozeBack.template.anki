@@ -23,6 +23,6 @@
   onclick="this.style.display='none';document.getElementById('more_back').style.display='inline-block';return false;">
   More</div>
 <div id="more_back" class="more more-content" style="display: none">
-  <div id="more">{{More}}</div>
+  <div id="more">{{edit:More}}</div>
 </div>
 {{/More}}
