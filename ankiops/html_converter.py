@@ -5,10 +5,10 @@ import re
 from bs4 import BeautifulSoup
 from html_to_markdown import ConversionOptions, convert_with_visitor
 
-# Characters that have special meaning in markdown
 # Use Unicode placeholders (zero-width joiners + unique pattern)
 _MD_SPECIAL_CHARS = {
     "*": "\u200dMDESCASTERISK\u200d",
+    # other characters are adequately escaped by html-to-markdown
 }
 
 # Tags where content is already protected (don't escape inside these)
@@ -113,20 +113,19 @@ class _AnkiVisitor:
         return {"type": "continue"}
 
 
-_OPTIONS = ConversionOptions(
-    heading_style="atx",
-    bullets="-",
-    list_indent_width=3,
-    highlight_style="double-equal",
-    autolinks=False,
-    extract_metadata=False,
-)
-
-_VISITOR = _AnkiVisitor()
-
-
 class HTMLToMarkdown:
     """Convert HTML to clean Markdown."""
+
+    _OPTIONS = ConversionOptions(
+        heading_style="atx",
+        bullets="-",
+        list_indent_width=3,
+        highlight_style="double-equal",
+        autolinks=False,
+        extract_metadata=False,
+    )
+
+    _VISITOR = _AnkiVisitor()
 
     def convert(self, html: str) -> str:
         """Convert HTML to Markdown."""
@@ -141,7 +140,7 @@ class HTMLToMarkdown:
         # Protect literal characters before conversion
         html = _protect_literal_chars(html)
 
-        md = convert_with_visitor(html, _OPTIONS, visitor=_VISITOR)
+        md = convert_with_visitor(html, self._OPTIONS, visitor=self._VISITOR)
 
         # Restore as escaped characters
         md = _restore_escaped_chars(md)
