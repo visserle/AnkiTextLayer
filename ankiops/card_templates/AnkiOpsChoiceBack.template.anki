@@ -96,13 +96,25 @@ choices.forEach(function(choice) {
 });
 </script>
 
-{{#Extra}}
 <hr>
+
+{{#Extra}}
 {{edit:Extra}}
 {{/Extra}}
 
+{{^Extra}}
+{{^More}}
+{{edit:Extra}}
+{{/More}}
+{{/Extra}}
+
+{{#Extra}}
 {{#More}}
 <hr>
+{{/More}}
+{{/Extra}}
+
+{{#More}}
 <div class="more more-button" href="#"
     onclick="this.style.display='none';document.getElementById('more_back').style.display='inline-block';return false;">
     More</div>
