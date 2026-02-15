@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import requests
+
 from ankiops.config import ANKI_CONNECT_URL, SUPPORTED_NOTE_TYPES
 
 logger = logging.getLogger(__name__)
