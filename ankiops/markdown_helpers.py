@@ -143,15 +143,41 @@ def has_untracked_notes(cards_content: str) -> bool:
     return False
 
 
-def _detect_note_type(fields: dict[str, str]) -> str:
-    """Detect note type from parsed fields (most specific first)."""
-    if "Choice 1" in fields:
-        return "AnkiOpsChoice"
-    if "Text" in fields:
-        return "AnkiOpsCloze"
-    if "Question" in fields or "Answer" in fields:
-        return "AnkiOpsQA"
-    raise ValueError("Cannot determine note type: no Q:, A:, T:, or C1: field found")
+def infer_note_type(fields: dict[str, str]) -> str:
+    """Infer note type from parsed fields based on required fields.
+
+    Checks all note types except AnkiOpsQA first (which is more specific),
+    then falls back to AnkiOpsQA as the generic catch-all.
+    """
+    # Check all note types except AnkiOpsQA first
+    for note_type, config in NOTE_TYPES.items():
+        if note_type == "AnkiOpsQA":
+            continue
+
+        required_fields = {
+            field_name
+            for field_name, _, is_required in config["field_mappings"]
+            if is_required
+        }
+
+        if required_fields.issubset(fields.keys()):
+            return note_type
+
+    # Fall back to AnkiOpsQA if present
+    if "AnkiOpsQA" in NOTE_TYPES:
+        qa_config = NOTE_TYPES["AnkiOpsQA"]
+        required_fields = {
+            field_name
+            for field_name, _, is_required in qa_config["field_mappings"]
+            if is_required
+        }
+
+        if required_fields.issubset(fields.keys()):
+            return "AnkiOpsQA"
+
+    raise ValueError(
+        "Cannot determine note type from fields: " + ", ".join(fields.keys())
+    )
 
 
 def parse_note_block(block: str) -> ParsedNote:
@@ -221,7 +247,7 @@ def parse_note_block(block: str) -> ParsedNote:
 
     return ParsedNote(
         note_id=note_id,
-        note_type=_detect_note_type(fields),
+        note_type=infer_note_type(fields),
         fields=fields,
         raw_content=block,
     )
@@ -365,17 +391,34 @@ def format_note(
 def convert_fields_to_html(
     fields: dict[str, str],
     converter,
+    note_type: str = "",
 ) -> dict[str, str]:
     """Convert all field values from markdown to HTML.
+
+    When *note_type* is given, the returned dict contains an entry for every
+    field defined by that note type.  Fields absent from *fields* get an empty
+    string, so that Anki clears them when the user removes an optional field
+    from the markdown.
 
     Args:
         fields: Dictionary mapping field names to markdown content
         converter: MarkdownToHTML converter instance
+        note_type: Optional note-type name (e.g. ``"AnkiOpsQA"``).
 
     Returns:
         Dictionary mapping field names to HTML content
     """
-    return {name: converter.convert(content) for name, content in fields.items()}
+    html = {name: converter.convert(content) for name, content in fields.items()}
+
+    if note_type:
+        from ankiops.config import NOTE_TYPES
+
+        for field_name, _, _ in NOTE_TYPES.get(note_type, {}).get(
+            "field_mappings", []
+        ):
+            html.setdefault(field_name, "")
+
+    return html
 
 
 def sanitize_filename(deck_name: str) -> str:

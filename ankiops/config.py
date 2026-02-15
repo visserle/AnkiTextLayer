@@ -10,11 +10,12 @@ ANKI_CONNECT_URL = "http://localhost:8765"
 
 MARKER_FILE = ".ankiops"
 
-NOTE_SEPARATOR = "\n\n---\n\n"  # changing the whitespace might lead to issues
-
 AUTO_COMMIT_DEFAULT = True
 
-# Per-note-type configuration
+NOTE_SEPARATOR = "\n\n---\n\n"  # changing the whitespace might lead to issues
+
+# Each note type has a list of field mappings, where each mapping is a tuple of:
+# (field_name, prefix, required)
 NOTE_TYPES = {
     "AnkiOpsQA": {
         "field_mappings": [
@@ -24,9 +25,25 @@ NOTE_TYPES = {
             ("More", "M:", False),
         ],
     },
+    "AnkiOpsReversed": {
+        "field_mappings": [
+            ("Front", "F:", True),
+            ("Back", "B:", True),
+            ("Extra", "E:", False),
+            ("More", "M:", False),
+        ],
+    },
     "AnkiOpsCloze": {
         "field_mappings": [
             ("Text", "T:", True),
+            ("Extra", "E:", False),
+            ("More", "M:", False),
+        ],
+    },
+    "AnkiOpsInput": {
+        "field_mappings": [
+            ("Question", "Q:", True),
+            ("Input", "I:", True),
             ("Extra", "E:", False),
             ("More", "M:", False),
         ],
