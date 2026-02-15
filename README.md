@@ -77,12 +77,11 @@ C2: with
 C3: automatically randomized answers.
 A: 1,3
 
----
-
-And so on…
 ```
 
-For the last note in the example, a `note_id` will be assigned with the first import.
+In this example, the last note is a new note which will get a `note_id` assigned with the next import.
+
+### How are the different note types identified?
 
 Each note type is identified by its field prefixes. `E:` (Extra) and `M:` (More, revealed on click) are optional fields shared across all note types.
 
