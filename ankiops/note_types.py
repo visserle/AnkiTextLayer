@@ -125,27 +125,8 @@ def ensure_note_types() -> None:
     """Ensure all required note types exist in Anki and are up to date."""
     existing = set(invoke("modelNames"))
 
-    if "AnkiOpsQA" not in existing:
-        _create_model("AnkiOpsQA", is_cloze=False)
-    elif not _is_model_up_to_date("AnkiOpsQA"):
-        _update_model("AnkiOpsQA")
-
-    if "AnkiOpsReversed" not in existing:
-        _create_model("AnkiOpsReversed", is_cloze=False)
-    elif not _is_model_up_to_date("AnkiOpsReversed"):
-        _update_model("AnkiOpsReversed")
-
-    if "AnkiOpsCloze" not in existing:
-        _create_model("AnkiOpsCloze", is_cloze=True)
-    elif not _is_model_up_to_date("AnkiOpsCloze"):
-        _update_model("AnkiOpsCloze")
-
-    if "AnkiOpsInput" not in existing:
-        _create_model("AnkiOpsInput", is_cloze=False)
-    elif not _is_model_up_to_date("AnkiOpsInput"):
-        _update_model("AnkiOpsInput")
-
-    if "AnkiOpsChoice" not in existing:
-        _create_model("AnkiOpsChoice", is_cloze=False)
-    elif not _is_model_up_to_date("AnkiOpsChoice"):
-        _update_model("AnkiOpsChoice")
+    for model_name in NOTE_TYPES.keys():
+        if model_name not in existing:
+            _create_model(model_name, is_cloze=("cloze" in model_name.lower()))
+        elif not _is_model_up_to_date(model_name):
+            _update_model(model_name)

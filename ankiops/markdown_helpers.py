@@ -163,17 +163,11 @@ def infer_note_type(fields: dict[str, str]) -> str:
         if required_fields.issubset(fields.keys()):
             return note_type
 
-    # Fall back to AnkiOpsQA if present
-    if "AnkiOpsQA" in NOTE_TYPES:
-        qa_config = NOTE_TYPES["AnkiOpsQA"]
-        required_fields = {
-            field_name
-            for field_name, _, is_required in qa_config["field_mappings"]
-            if is_required
-        }
-
-        if required_fields.issubset(fields.keys()):
-            return "AnkiOpsQA"
+    # Fall back to AnkiOpsQA when both Question and Answer fields are present.
+    # Validation of required fields happens later in validate_note.
+    qa_fields = {"Question", "Answer"}
+    if qa_fields.issubset(fields.keys()):
+        return "AnkiOpsQA"
 
     raise ValueError(
         "Cannot determine note type from fields: " + ", ".join(fields.keys())

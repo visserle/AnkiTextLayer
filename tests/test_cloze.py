@@ -178,9 +178,8 @@ class TestValidateNote:
 
     def test_missing_mandatory_qa_fields(self):
         block = "<!-- note_id: 1 -->\nQ: Question only"
-        parsed_note = parse_note_block(block)
-        errors = validate_note(parsed_note)
-        assert any("Answer" in e and "A:" in e for e in errors)
+        with pytest.raises(ValueError, match="Cannot determine note type"):
+            parse_note_block(block)
 
     def test_missing_mandatory_cloze_field(self):
         # Construct directly since T: without cloze syntax would fail validation
